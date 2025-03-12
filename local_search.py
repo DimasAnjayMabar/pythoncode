@@ -2,7 +2,6 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import time
 import psutil
-import heapq
 import math
 import random
 
