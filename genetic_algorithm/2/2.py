@@ -189,18 +189,17 @@ def crossover(parent1, parent2, parent1_idx, parent2_idx):
     if random.random() < CROSSOVER_RATE: 
         crossover_details["crossover_happened"] = True
         
-        for ship_name in parent1.keys():  # For each ship (Ship1, Ship2, Ship3)
-            if random.random() < 0.5:  # 50% chance to inherit from each parent
-                child[ship_name]["container"] = parent1[ship_name]["container"][:]  # Copy containers from parent1
+        for ship_name in parent1.keys():  # setiap kapal di 1 populasi
+            if random.random() < 0.5:  # menggunakan crossover yang lebih simpel, dengan memilih hanya setengah dari list container dalam kapal untuk ditukar
+                child[ship_name]["container"] = parent1[ship_name]["container"][:]  # copy container dari parent1
                 crossover_details["ship_inheritance"][ship_name] = "parent1"
             else:
-                child[ship_name]["container"] = parent2[ship_name]["container"][:]  # Copy containers from parent2
+                child[ship_name]["container"] = parent2[ship_name]["container"][:]  # copy container dari parent2
                 crossover_details["ship_inheritance"][ship_name] = "parent2"
         
-        # Return child and crossover details
         return child, crossover_details
     
-    # If no crossover, child is identical to parent1
+    # jika tidak ada crossover, maka akan mengembalikan parent1
     for ship_name in parent1.keys():
         child[ship_name]["container"] = parent1[ship_name]["container"][:]
         crossover_details["ship_inheritance"][ship_name] = "parent1 (no crossover)"
