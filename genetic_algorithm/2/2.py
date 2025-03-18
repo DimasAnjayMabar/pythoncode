@@ -67,8 +67,8 @@ containers = {
 
 # Fungsi inisialisasi target price yang dynamic agar meningkatkan kinerja fitness function
 def get_initial_target_price(population):
-    avg_cost = sum(evaluate_fitness(ind) for ind in population) / len(population) # Menghitung average cost dari initial population
-    return avg_cost * 1.2 # Set 20% lebih tinggi dari avg cost untuk target price
+    avg_cost = sum(evaluate_fitness(ind)[0] for ind in population) / len(population)  # Menghitung average cost dari initial population
+    return avg_cost * 1.2  # Set 20% lebih tinggi dari avg cost untuk target price
 
 # Visualisasi kromosom (representasi solusi)
 def solution_to_chromosome(solution):
@@ -163,7 +163,7 @@ def initialize_population():
 def evaluate_fitness(expedition):
     total_cost = sum(container["cost"] for ship in expedition.values() for container in ship["container"])  # Total cost of all containers
     
-    # Penalti untuk container yang tidak terangkut
+    # Track missing containers
     assigned_containers = {container["id"] for ship in expedition.values() for container in ship["container"]}
     total_containers = set(containers.keys())
     missing_containers = total_containers - assigned_containers
@@ -172,22 +172,21 @@ def evaluate_fitness(expedition):
         penalty = len(missing_containers) * 1_000_000_000  # Huge penalty for missing containers
         total_cost += penalty
         print(f"[PENALTY] {len(missing_containers)} missing containers! Adding {format_rupiah(penalty)} penalty.")
-
-    return total_cost
+    
+    return total_cost, missing_containers  # Return both total cost and missing containers
 
 # Fungsi crossover dengan detail
 def crossover(parent1, parent2, parent1_idx, parent2_idx):
-    child = initialize_expedition()  # Create a new empty expedition
-    
-    # For tracking crossover details
-    crossover_details = {
+    child = initialize_expedition() # menyiapkan kapal untuk mengangkut container
+
+    crossover_details = { # melacak crossover
         "parent1_idx": parent1_idx,
         "parent2_idx": parent2_idx,
         "crossover_happened": False,
         "ship_inheritance": {}
     }
     
-    if random.random() < CROSSOVER_RATE:  # Apply crossover if random number is less than CROSSOVER_RATE
+    if random.random() < CROSSOVER_RATE: 
         crossover_details["crossover_happened"] = True
         
         for ship_name in parent1.keys():  # For each ship (Ship1, Ship2, Ship3)
@@ -210,8 +209,8 @@ def crossover(parent1, parent2, parent1_idx, parent2_idx):
 
 # Fungsi mutation dengan detail
 def mutate(expedition):
-    expedition_copy = deepcopy(expedition)  # Create a copy to compare before/after
-    original_chromosome = solution_to_chromosome(expedition_copy)
+    expedition_copy = deepcopy(expedition)  # untuk copy raw sebelum mutasi
+    original_chromosome = solution_to_chromosome(expedition_copy) # print raw
     
     mutation_details = {
         "mutation_happened": False,
@@ -222,23 +221,23 @@ def mutate(expedition):
         "mutated_chromosome": None
     }
     
-    if random.random() < MUTATION_RATE:  # Apply mutation if random number is less than MUTATION_RATE
-        ship_from, ship_to = random.sample(list(expedition.keys()), 2)  # Select two random ships
+    if random.random() < MUTATION_RATE:  # memilih 10% mana yang di mutasi
+        ship_from, ship_to = random.sample(list(expedition.keys()), 2)  # meilih kapal asal dan tujuan
         mutation_details["ship_from"] = ship_from
         mutation_details["ship_to"] = ship_to
 
-        if expedition[ship_from]["container"]:  # Check if source ship has containers
-            container = random.choice(expedition[ship_from]["container"])  # Select a random container
+        if expedition[ship_from]["container"]:  # cek ketersediaan container dalam kapal
+            container = random.choice(expedition[ship_from]["container"])  # memilih random container
             mutation_details["container_id"] = container["id"]
 
-            # Check if destination ship has enough capacity
+            # cek kapal tujuan apakah cukup
             total_weight_ship_to = sum(c["weight"] for c in expedition[ship_to]["container"])
             if total_weight_ship_to + container["weight"] <= expedition[ship_to]["capacity"]:
-                expedition[ship_from]["container"].remove(container)  # Remove from source ship
-                expedition[ship_to]["container"].append(container)  # Add to destination ship
+                expedition[ship_from]["container"].remove(container)  # hapus container dari kapal asal
+                expedition[ship_to]["container"].append(container)  # tambah container ke kapal tujuan
                 mutation_details["mutation_happened"] = True
     
-    # Capture the chromosome after mutation
+    # debug setelah mutasi
     mutation_details["mutated_chromosome"] = solution_to_chromosome(expedition)
     
     return expedition, mutation_details
@@ -287,32 +286,30 @@ def rank_selection(population, fitnesses, selection_index):
     return selected_solution, selection_details
 
 # Display selection details
-def display_selections(selection_details_list, generation):
-    print(f"\n=== Generation {generation}: Selection Details ===")
+def display_solution(solution, fitness, missing_containers, index=None):
+    if index is not None:
+        print(f"Expedition #{index}: Cost = {format_rupiah(fitness)}")
+    else:
+        print(f"Expedition: Cost = {format_rupiah(fitness)}")
+        
+    for ship_name, ship in solution.items():
+        weight = sum(c["weight"] for c in ship["container"])
+        containers_in_ship = len(ship["container"])
+        if containers_in_ship > 0:
+            print(f"  {ship_name}: {containers_in_ship} containers, Weight: {weight}/{ship['capacity']}")
+            for container in ship["container"]:
+                special = "Special" if container["isSpecial"] else "Regular"
+                print(f"    - Container {container['id']} ({special}): Weight {container['weight']}, Cost {format_rupiah(container['cost'])}, To: {container['destination'][0]}")
     
-    selection_data = []
-    for details in selection_details_list:
-        selection_data.append({
-            'Selection ID': details["selection_id"],
-            'Selected Expedition': details["selected_idx"],
-            'Fitness': format_rupiah(details["selected_fitness"])
-        })
-    
-    df = pd.DataFrame(selection_data)
-    print(tabulate(df, headers='keys', tablefmt='grid', showindex=False))
-    
-    # Display rank probabilities for the first selection as an example
-    if selection_details_list:
-        first_selection = selection_details_list[0]
-        print("\nRank Selection Probabilities Example (from first selection):")
-        rank_data = []
-        for idx, prob in first_selection["probabilities"]:
-            rank_data.append({
-                'Expedition': idx,
-                'Probability': f"{prob:.4f}"
-            })
-        df_ranks = pd.DataFrame(rank_data)
-        print(tabulate(df_ranks, headers='keys', tablefmt='grid', showindex=False))
+    # Display missing containers
+    if missing_containers:
+        print("\n  Missing Containers:")
+        for container_id in missing_containers:
+            container = containers[container_id]
+            special = "Special" if container["isSpecial"] else "Regular"
+            print(f"    - Container {container_id} ({special}): Weight {container['weight']}, Cost {format_rupiah(container['cost'])}, To: {container['destination'][0]}")
+    else:
+        print("\n  All containers assigned.")
 
 # Display crossover details
 def display_crossovers(crossover_details_list, generation):
@@ -361,18 +358,6 @@ def display_mutations(mutation_details_list, generation):
 
 # Algoritma Genetika
 def genetic_algorithm():
-    # Display explanatory text about the genetic algorithm structure
-    print("\n" + "="*80)
-    print("GENETIC ALGORITHM FOR EXPEDITION PLANNING")
-    print("="*80)
-    print("Structure:")
-    print("- Population: Collection of multiple expedition solutions")
-    print("- Expedition: One solution (chromosome) containing 3 ships")
-    print("- Chromosome Representation: Shows which ship each container is assigned to")
-    print("  Position = Container ID, Value = Ship (1=Ship1, 2=Ship2, 3=Ship3, 0=Not assigned)")
-    print("- Fitness: Total cost of the expedition (lower is better)")
-    print("="*80)
-    
     # Initialize population
     population = initialize_population()
     global TARGET_PRICE
@@ -380,8 +365,7 @@ def genetic_algorithm():
 
     best_solution = None
     best_fitness = float("inf")
-    best_generation = -1
-    best_population_index = -1
+    best_missing_containers = set()
 
     for gen in range(GEN_COUNT):
         print(f"\n{'='*80}")
@@ -389,7 +373,12 @@ def genetic_algorithm():
         print(f"{'='*80}")
         
         # Evaluate population
-        fitnesses = [evaluate_fitness(ind) for ind in population]
+        fitnesses = []
+        missing_containers_list = []
+        for ind in population:
+            fitness, missing_containers = evaluate_fitness(ind)
+            fitnesses.append(fitness)
+            missing_containers_list.append(missing_containers)
         
         # Display population chromosomes
         display_chromosome_table(population, fitnesses, f"Generation {gen+1}: Raw Solutions/Chromosomes")
@@ -398,84 +387,52 @@ def genetic_algorithm():
         gen_best_idx = fitnesses.index(min(fitnesses))
         gen_best_solution = population[gen_best_idx]
         gen_best_fitness = fitnesses[gen_best_idx]
+        gen_best_missing_containers = missing_containers_list[gen_best_idx]
         
         print(f"\n* Generation {gen+1} Best Expedition (Index {gen_best_idx}):")
-        display_solution(gen_best_solution, gen_best_fitness)
+        display_solution(gen_best_solution, gen_best_fitness, gen_best_missing_containers, gen_best_idx)
         
-        # Track all time best solution
-        assigned_containers = {c["id"] for s in gen_best_solution.values() for c in s["container"]}
+        # Track all-time best solution
         if gen_best_fitness < best_fitness:
             best_solution = gen_best_solution
             best_fitness = gen_best_fitness
-            best_generation = gen + 1
-            best_population_index = gen_best_idx
+            best_missing_containers = gen_best_missing_containers
         
         print(f"\nGeneration {gen+1} Stats:")
         print(f"- Best fitness: {format_rupiah(min(fitnesses))}")
         print(f"- Average fitness: {format_rupiah(sum(fitnesses)/len(fitnesses))}")
-        print(f"- Current best fitness overall: {format_rupiah(best_fitness)} (Gen {best_generation}, Index {best_population_index})")
+        print(f"- Current best fitness overall: {format_rupiah(best_fitness)}")
         
-        # Lists to store details of genetic operations
-        selection_details_list = []
+        # Create new population
         new_population = []
         crossover_details_list = []
         mutation_details_list = []
         
         # Selection & crossover loop
-        selection_counter = 0
         while len(new_population) < POP_SIZE:
             # Select parents
-            parent1, selection1 = rank_selection(population, fitnesses, selection_counter)
-            selection_counter += 1
-            parent2, selection2 = rank_selection(population, fitnesses, selection_counter)
-            selection_counter += 1
-            
-            # Store selection details
-            selection_details_list.append(selection1)
-            selection_details_list.append(selection2)
+            parent1, selection1 = rank_selection(population, fitnesses, len(new_population))
+            parent2, selection2 = rank_selection(population, fitnesses, len(new_population) + 1)
             
             # Generate offspring with crossover
-            offspring, crossover_details = crossover(
-                parent1, parent2, 
-                selection1["selected_idx"], selection2["selected_idx"]
-            )
+            offspring, crossover_details = crossover(parent1, parent2, selection1["selected_idx"], selection2["selected_idx"])
             crossover_details_list.append(crossover_details)
             
-            # Apply mutation and store details
+            # Apply mutation
             mutated_offspring, mutation_details = mutate(offspring)
             mutation_details_list.append(mutation_details)
             
             # Add to new population
             new_population.append(mutated_offspring)
         
-        # Display selection details
-        display_selections(selection_details_list, gen+1)
-        
-        # Display crossover details
-        display_crossovers(crossover_details_list, gen+1)
-        
-        # Display mutation details
-        display_mutations(mutation_details_list, gen+1)
-        
-        # Calculate fitness of new population
-        new_fitnesses = [evaluate_fitness(ind) for ind in new_population]
-        display_chromosome_table(new_population, new_fitnesses, f"Generation {gen+1}: New Population After Genetic Operations")
-        
-        # Select best chromosomes for next generation
-        population = sorted(new_population, key=evaluate_fitness)[:POP_SIZE]
+        # Replace the old population with the new population
+        population = new_population
     
-    # Ensure we have a solution
-    if best_solution is None:
-        print("\n⚠️ No valid solution was found! Picking the best available solution.")
-        best_solution = population[0] 
-        best_fitness = evaluate_fitness(best_solution)
-
     # Display final best solution
     print("\n" + "="*80)
     print("FINAL BEST SOLUTION")
     print("="*80)
-    print(f"✅ Selected from Generation {best_generation}, Expedition Index {best_population_index}")
-    display_solution(best_solution, best_fitness)
+    display_solution(best_solution, best_fitness, best_missing_containers)
     
     # Display best solution as chromosome
     best_chromosome = solution_to_chromosome(best_solution)
