@@ -205,21 +205,24 @@ def rank_selection(population, fitnesses, selection_index):
 
 # algoritma genetika utama
 def genetic_algorithm():
-    # inisialisasi populasi awal
+    # Inisialisasi populasi awal
     population = initialize_population()
     global target_price
     target_price = get_initial_target_price(population)
 
-    best_solution = None  # solusi terbaik
-    best_fitness = float("inf")  # fitness terbaik (biaya terendah)
-    best_missing_containers = set()  # container yang tidak terangkut pada solusi terbaik
+    # Variabel untuk menyimpan solusi terbaik secara global
+    global_best_solution = None
+    global_best_fitness = float("inf")
+    global_best_missing_containers = set()
+    global_best_generation = -1
+    global_best_index = -1
 
     for gen in range(GEN_COUNT):  # iterasi sebanyak gen_count generasi
         print(f"\n{'='*80}")
-        print(f"generation {gen+1}")
+        print(f"GENERATION {gen+1}")
         print(f"{'='*80}")
         
-        # evaluasi fitness setiap individu dalam populasi
+        # Evaluasi fitness setiap individu dalam populasi
         fitnesses = []
         missing_containers_list = []
         for ind in population:
@@ -227,64 +230,71 @@ def genetic_algorithm():
             fitnesses.append(fitness)
             missing_containers_list.append(missing_containers)
         
-        # menampilkan tabel kromosom
-        display_chromosome_table(population, fitnesses, f"generation {gen+1}: raw solutions/chromosomes")
+        # Menampilkan tabel kromosom
+        display_chromosome_table(population, fitnesses, f"Generation {gen+1}: Raw Solutions/Chromosomes")
         
-        # mencari solusi terbaik dalam generasi ini
+        # Mencari solusi terbaik dalam generasi ini
         gen_best_idx = fitnesses.index(min(fitnesses))
         gen_best_solution = population[gen_best_idx]
         gen_best_fitness = fitnesses[gen_best_idx]
         gen_best_missing_containers = missing_containers_list[gen_best_idx]
         
-        print(f"\n* generation {gen+1} best expedition (index {gen_best_idx}):")
+        # Memperbarui solusi terbaik secara global
+        if gen_best_fitness < global_best_fitness:
+            global_best_solution = gen_best_solution
+            global_best_fitness = gen_best_fitness
+            global_best_missing_containers = gen_best_missing_containers
+            global_best_generation = gen + 1  # Simpan generasi terbaik
+            global_best_index = gen_best_idx  # Simpan indeks populasi terbaik
+        
+        print(f"\n* Generation {gen+1} Best Expedition (Index {gen_best_idx}):")
         display_solution(gen_best_solution, gen_best_fitness, gen_best_missing_containers, gen_best_idx)
         
-        # memperbarui solusi terbaik secara keseluruhan
-        if gen_best_fitness < best_fitness:
-            best_solution = gen_best_solution
-            best_fitness = gen_best_fitness
-            best_missing_containers = gen_best_missing_containers
+        print(f"\nGeneration {gen+1} Stats:")
+        print(f"- Best fitness: {format_rupiah(min(fitnesses))}")
+        print(f"- Average fitness: {format_rupiah(sum(fitnesses)/len(fitnesses))}")
+        print(f"- Current best fitness overall: {format_rupiah(global_best_fitness)}")
         
-        print(f"\ngeneration {gen+1} stats:")
-        print(f"- best fitness: {format_rupiah(min(fitnesses))}")
-        print(f"- average fitness: {format_rupiah(sum(fitnesses)/len(fitnesses))}")
-        print(f"- current best fitness overall: {format_rupiah(best_fitness)}")
-        
-        # membuat populasi baru
+        # Membuat populasi baru
         new_population = []
         crossover_details_list = []
         mutation_details_list = []
         
-        # loop untuk seleksi dan crossover
+        # Loop untuk seleksi dan crossover
         while len(new_population) < POP_SIZE:
-            # memilih parent
+            # Memilih parent
             parent1, selection1 = rank_selection(population, fitnesses, len(new_population))
             parent2, selection2 = rank_selection(population, fitnesses, len(new_population) + 1)
             
-            # menghasilkan offspring
+            # Menghasilkan offspring
             offspring, crossover_details = crossover(parent1, parent2, selection1["selected_idx"], selection2["selected_idx"])
             crossover_details_list.append(crossover_details)
             
-            # melakukan mutasi
+            # Melakukan mutasi
             mutated_offspring, mutation_details = mutate(offspring)
             mutation_details_list.append(mutation_details)
             
-            # menambahkan offspring ke populasi baru
+            # Menambahkan offspring ke populasi baru
             new_population.append(mutated_offspring)
         
-        # menggantikan populasi lama dengan populasi baru
+        # Menggantikan populasi lama dengan populasi baru
         population = new_population
     
-    # menampilkan solusi terbaik akhir
+    # Menampilkan solusi terbaik akhir
     print("\n" + "="*80)
-    print("final best solution")
+    print("FINAL BEST SOLUTION")
     print("="*80)
-    display_solution(best_solution, best_fitness, best_missing_containers)
+    print(f"Best solution found in Generation {global_best_generation}, Population Index {global_best_index}:")
     
-    # menampilkan kromosom solusi terbaik
-    best_chromosome = solution_to_chromosome(best_solution)
-    print(f"\nbest solution chromosome: {' '.join(map(str, best_chromosome))}")
-    print(f"final fitness: {format_rupiah(best_fitness)}")
+    # Display the best solution in detail
+    display_solution(global_best_solution, global_best_fitness, global_best_missing_containers, global_best_index)
+    
+    # Display the best solution chromosome in table format
+    print("\nBest Solution Chromosome (Table View):")
+    display_chromosome_table([global_best_solution], [global_best_fitness], "Best Solution Chromosome")
+    
+    # Menampilkan kromosom solusi terbaik
+    best_chromosome = solution_to_chromosome(global_best_solution)
 
 # DEBUG FUNCTIONS
 
@@ -358,53 +368,39 @@ def display_solution(solution, fitness, missing_containers, index=None):
     else:
         print("\n  All containers assigned.")
 
-# debug detail ekspedisi
-def display_solution(solution, fitness, index=None):
-    if index is not None:
-        print(f"Expedition #{index}: Cost = {format_rupiah(fitness)}")
-    else:
-        print(f"Expedition: Cost = {format_rupiah(fitness)}")
-        
-    for ship_name, ship in solution.items():
-        weight = sum(c["weight"] for c in ship["container"])
-        containers_in_ship = len(ship["container"])
-        if containers_in_ship > 0:
-            print(f"  {ship_name}: {containers_in_ship} containers, Weight: {weight}/{ship['capacity']}")
-            for container in ship["container"]:
-                special = "Special" if container["isSpecial"] else "Regular"
-                print(f"    - Container {container['id']} ({special}): Weight {container['weight']}, Cost {format_rupiah(container['cost'])}, To: {container['destination'][0]}")
-
 # Tampilkan tabel kromosom
 def display_chromosome_table(population, fitnesses, title):
-    """Display chromosomes in a table format"""
+    """Display chromosomes in a table format with container assignments per ship."""
     print(f"\n=== {title} ===")
-    print("Legend: 0=Not assigned, 1=Ship1, 2=Ship2, 3=Ship3")
-    print("Each position represents a container, e.g., '1 2 3' means Container1→Ship1, Container2→Ship2, Container3→Ship3")
+    print("Legend: Each row represents an expedition. Containers are grouped by the ship they are assigned to.")
     
-    chromosome_data = []
-    for i, (solution, fitness) in enumerate(zip(population, fitnesses)):
-        chromosome = solution_to_chromosome(solution)
-        missing = chromosome.count(0)
-        # hitung container per kapal
-        ship_counts = {
-            "Ship1": chromosome.count(1),
-            "Ship2": chromosome.count(2),
-            "Ship3": chromosome.count(3)
-        }
+    # Prepare data for the table
+    table_data = []
+    for idx, (expedition, fitness) in enumerate(zip(population, fitnesses)):
+        # Extract container IDs assigned to each ship
+        ship_assignments = {f"Ship{i}": [] for i in range(1, 4)}  # Initialize empty lists for Ship1, Ship2, Ship3
+        for ship_name, ship in expedition.items():
+            for container in ship["container"]:
+                ship_assignments[ship_name].append(container["id"])
         
-        chromosome_data.append({
-            'Expedition': i,
-            'Container Assigned to Which Ship': ' '.join(map(str, chromosome)),
-            'Ship1': ship_counts["Ship1"],
-            'Ship2': ship_counts["Ship2"],
-            'Ship3': ship_counts["Ship3"],
-            'Missing': missing,
-            'Fitness': format_rupiah(fitness)
-        })
+        # Format the container IDs as a string for display
+        for ship_name in ship_assignments:
+            ship_assignments[ship_name] = ", ".join(map(str, sorted(ship_assignments[ship_name]))) if ship_assignments[ship_name] else "None"
+        
+        # Add row to the table
+        table_data.append([
+            idx,  # Expedition index
+            ship_assignments["Ship1"],  # Containers in Ship1
+            ship_assignments["Ship2"],  # Containers in Ship2
+            ship_assignments["Ship3"],  # Containers in Ship3
+            format_rupiah(fitness)  # Fitness value
+        ])
     
-    df = pd.DataFrame(chromosome_data)
-    print(tabulate(df, headers='keys', tablefmt='grid', showindex=False))
-
+    # Define table headers
+    headers = ["Expedition", "Ship1 Containers", "Ship2 Containers", "Ship3 Containers", "Fitness"]
+    
+    # Display the table
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
 # visualisasi kromosom (representasi solusi)
 def solution_to_chromosome(solution):
