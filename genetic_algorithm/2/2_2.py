@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import random
 from typing import List, Dict, Tuple
 import time
+from deprecated import deprecated
 
 # Definisi kelas untuk Peti Kemas
 class PetiKemas:
@@ -24,8 +25,8 @@ class Kapal:
 # Kelas utama untuk Algoritma Genetika
 class GeneticAlgorithmContainerOptimization:
     def __init__(self, 
-                 peti_kemas_list: List[PetiKemas], 
-                 kapal: Kapal,
+                 peti_kemas_list: List[PetiKemas], # list peti kemas
+                 kapal: Kapal, # 
                  populasi_size: int,
                  max_generations: int,
                  crossover_rate: float,
@@ -183,49 +184,56 @@ class GeneticAlgorithmContainerOptimization:
         return [population[i].copy() for i in elite_indices]
     
     def evolve(self):
-        """Menjalankan algoritma genetika."""
-        # Inisialisasi populasi
+        """Run the genetic algorithm with debugging and track the best solution."""
+        # Initialize population
         population = self.create_initial_population()
         
-        # Variabel untuk early stopping
+        # Variables for tracking best solution
         best_fitness = 0
-        generations_no_improvement = 0
-        
+        best_chromosome = None
+        best_generation = -1  # Tracks the generation when best solution appeared
+        best_population_index = -1  # Tracks the index in the population
+
+        generations_no_improvement = 0  # Early stopping counter
+
         for generation in range(self.max_generations):
-            # Menghitung fitness setiap kromosom
+            # Calculate fitness for each chromosome
             fitness_values = [self.calculate_fitness(chromosome) for chromosome in population]
-            
-            # Menyimpan kromosom dengan fitness terbaik
+
+            # Find best chromosome in this generation
             best_idx = fitness_values.index(max(fitness_values))
             current_best_fitness = fitness_values[best_idx]
             current_best_chromosome = population[best_idx]
-            
-            # Menyimpan history untuk plotting
+
+            # Store fitness history
             self.best_fitness_history.append(current_best_fitness)
             self.avg_fitness_history.append(sum(fitness_values) / len(fitness_values))
-            
-            # Early stopping jika tidak ada peningkatan
+
+            # Debugging: Print generation information
+            print(f"\nGeneration {generation + 1}/{self.max_generations}")
+            print(f"Best Fitness: {current_best_fitness:,}")
+            print(f"Best Chromosome: {current_best_chromosome} (Index: {best_idx})")
+
+            # Track the best solution overall
             if current_best_fitness > best_fitness:
                 best_fitness = current_best_fitness
                 best_chromosome = current_best_chromosome
-                generations_no_improvement = 0
+                best_generation = generation + 1  # Generations are 1-based
+                best_population_index = best_idx  # Index in that generation's population
+                generations_no_improvement = 0  # Reset improvement counter
             else:
                 generations_no_improvement += 1
                 if generations_no_improvement >= self.early_stopping:
-                    print(f"Early stopping at generation {generation + 1}")
+                    print(f"\nEarly stopping at generation {generation + 1}")
                     break
-            
-            # Print progress setiap 10 generasi
-            if (generation + 1) % 10 == 0:
-                print(f"Generation {generation + 1}/{self.max_generations}, Best Fitness: {best_fitness:,}")
-            
-            # Elitism - mempertahankan 10% kromosom terbaik
+
+            # Apply elitism
             elite_size = int(self.populasi_size * 0.1)
             elites = self.elitism(population, fitness_values, elite_size)
-            
-            # Seleksi, crossover dan mutasi untuk sisa populasi
+
+            # Selection using roulette wheel
             selected = self.roulette_wheel_selection(population, fitness_values)
-            
+
             # Crossover
             offspring = []
             for i in range(0, len(selected), 2):
@@ -234,28 +242,38 @@ class GeneticAlgorithmContainerOptimization:
                         child1, child2 = self.partially_mapped_crossover(selected[i], selected[i+1])
                     else:
                         child1, child2 = selected[i].copy(), selected[i+1].copy()
-                    
+
                     offspring.append(self.swap_mutation(child1))
                     offspring.append(self.swap_mutation(child2))
                 else:
                     offspring.append(self.swap_mutation(selected[i].copy()))
-            
-            # Membentuk populasi baru dengan menggabungkan elite dan offspring
+
+            # Create new population
             population = elites + offspring
-            
-            # Pastikan populasi berukuran tetap
+
+            # Ensure population size remains constant
             if len(population) > self.populasi_size:
                 population = population[:self.populasi_size]
-        
-        # Menghitung fitness akhir jika belum early stopping
+
+        # Final fitness calculation if no early stopping
         if generations_no_improvement < self.early_stopping:
             fitness_values = [self.calculate_fitness(chromosome) for chromosome in population]
             best_idx = fitness_values.index(max(fitness_values))
             if fitness_values[best_idx] > best_fitness:
                 best_fitness = fitness_values[best_idx]
                 best_chromosome = population[best_idx]
-        
-        return best_chromosome, best_fitness
+                best_generation = self.max_generations  # If best appears in the final generation
+                best_population_index = best_idx
+
+        # Print final best solution details
+        print(f"\n=== Best Solution Found ===")
+        print(f"Best Fitness: {best_fitness:,}")
+        print(f"Best Chromosome: {best_chromosome}")
+        print(f"Found at Generation: {best_generation}")
+        print(f"Population Index: {best_population_index}")
+
+        return best_chromosome, best_fitness, best_generation, best_population_index
+
     
     def plot_progress(self):
         """Membuat plot kemajuan algoritma genetika."""
@@ -327,7 +345,7 @@ class GeneticAlgorithmContainerOptimization:
 
 # Contoh penggunaan
 def run_example():
-    # Membuat daftar peti kemas
+    # Create container list
     peti_kemas_list = [
         PetiKemas(1, 5.0, "biasa", "Kota B", 200),
         PetiKemas(2, 3.0, "biasa", "Kota A", 100),
@@ -343,13 +361,35 @@ def run_example():
         PetiKemas(12, 5.5, "biasa", "Kota A", 100),
     ]
     
-    # Membuat kapal
-    kapal = Kapal(1, "Kapal Bahari Jaya", 60.0, 2)
+    # Create ship
+    kapal1 = Kapal(1, "Kapal Bahari Jaya", 60.0, 2)
+    kapal2 = Kapal(2, "Kapal Bangsat Jaya", 70.0, 1)
+    kapal3 = Kapal(3, "AIML Memek Kontol", 80.0, 2)
     
-    # Inisialisasi GA
-    ga = GeneticAlgorithmContainerOptimization(
+    # Initialize Genetic Algorithm
+    ga1 = GeneticAlgorithmContainerOptimization(
         peti_kemas_list=peti_kemas_list,
-        kapal=kapal,
+        kapal=kapal1,
+        populasi_size=100,
+        max_generations=200,
+        crossover_rate=0.8,
+        mutation_rate=0.15,
+        early_stopping=30
+    )
+
+    ga2 = GeneticAlgorithmContainerOptimization(
+        peti_kemas_list=peti_kemas_list,
+        kapal=kapal2,
+        populasi_size=100,
+        max_generations=200,
+        crossover_rate=0.8,
+        mutation_rate=0.15,
+        early_stopping=30
+    )
+
+    ga3 = GeneticAlgorithmContainerOptimization(
+        peti_kemas_list=peti_kemas_list,
+        kapal=kapal3,
         populasi_size=100,
         max_generations=200,
         crossover_rate=0.8,
@@ -357,18 +397,28 @@ def run_example():
         early_stopping=30
     )
     
-    # Jalankan algoritma
+    # Run the genetic algorithm
+    # Store the GA instances in a list
+    ga_instances = [ga1, ga2, ga3]
+
+    # Initialize empty lists to store results
+    best_chromosomes = []
+    best_fitnesses = []
+    best_generations = []
+    best_population_indices = []
+
+    # Run the genetic algorithm for each instance
     start_time = time.time()
-    best_chromosome, best_fitness = ga.evolve()
+    for ga in ga_instances:
+        best_chromosome, best_fitness, best_generation, best_population_index = ga.evolve()
+        best_chromosomes.append(best_chromosome)
+        best_fitnesses.append(best_fitness)
+        best_generations.append(best_generation)
+        best_population_indices.append(best_population_index)
     end_time = time.time()
-    
-    # Tampilkan hasil
-    print(f"\nWaktu eksekusi: {end_time - start_time:.2f} detik")
-    print(f"Fitness terbaik: {best_fitness:,}")
-    ga.decode_solution(best_chromosome)
-    
-    # Plot progress
-    ga.plot_progress()
+
+    # # Plot progress
+    # ga.plot_progress()
 
 if __name__ == "__main__":
     run_example()
