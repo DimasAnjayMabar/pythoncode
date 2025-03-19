@@ -363,8 +363,8 @@ def run_example():
     
     # Create ship
     kapal1 = Kapal(1, "Kapal Bahari Jaya", 60.0, 2)
-    kapal2 = Kapal(2, "Kapal Bangsat Jaya", 70.0, 1)
-    kapal3 = Kapal(3, "AIML Memek Kontol", 80.0, 2)
+    kapal2 = Kapal(2, "Kapal Krisna Jaya", 70.0, 1)
+    kapal3 = Kapal(3, "AIML Gosend", 80.0, 2)
     
     # Initialize Genetic Algorithm
     ga1 = GeneticAlgorithmContainerOptimization(
