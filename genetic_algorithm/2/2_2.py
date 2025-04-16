@@ -101,7 +101,7 @@ class GeneticAlgorithmContainerOptimization:
             # Menambahkan pendapatan
             if peti.jenis == "biasa":
                 total_revenue += peti.bobot * self.tarif_biasa
-            else:  # khusus
+            else:  # Khusus
                 total_revenue += peti.bobot * self.tarif_khusus
                 peti_khusus_count += 1
                 
