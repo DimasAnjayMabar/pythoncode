@@ -59,9 +59,9 @@ class GeneticAlgorithmContainerOptimization:
     
     def create_initial_population(self) -> List[List[int]]:
         """Membuat populasi awal dengan permutasi acak dari urutan peti kemas."""
-        population = []
+        population = [] # Init array
         for _ in range(self.populasi_size):
-            # Membuat permutasi acak dari peti kemas
+            # Membuat chromosome random
             chromosome = self.peti_ids.copy()
             random.shuffle(chromosome)
             population.append(chromosome)
@@ -71,6 +71,7 @@ class GeneticAlgorithmContainerOptimization:
         """Menghitung nilai fitness dari kromosom."""
         total_revenue = 0
         total_penalty = 0
+        penalty_customer = 0
         
         # Menyimpan informasi peti kemas dalam dictionary untuk akses cepat
         peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
@@ -111,9 +112,8 @@ class GeneticAlgorithmContainerOptimization:
         
         # Fitness adalah pendapatan dikurangi penalti
         fitness = total_revenue - total_penalty
-        return max(fitness, 1)  # Fitness minimal 1 untuk menghindari masalah pada roulette wheel
+        return max(fitness, 1) 
     
-    #satrio
     def tournament_selection(self, population: List[List[int]], fitness_values: List[float], tournament_size: int = 3) -> List[int]:
         """Memilih kromosom melalui tournament selection."""
         tournament_indices = random.sample(range(len(population)), tournament_size)
@@ -170,35 +170,35 @@ class GeneticAlgorithmContainerOptimization:
         return [population[i].copy() for i in elite_indices]
     
     def evolve(self):
-        """Run the genetic algorithm with debugging and track the best solution."""
+        """Run genetic algorithm"""
         # Initialize population
         population = self.create_initial_population()
         
-        # Variables for tracking best solution
+        # Variable untuk tracking best solution
         best_fitness = 0
         best_chromosome = None
-        best_generation = -1  # Tracks the generation when best solution appeared
-        best_population_index = -1  # Tracks the index in the population
+        best_generation = -1
+        best_population_index = -1
 
         generations_no_improvement = 0  # Early stopping counter
 
         for generation in range(self.max_generations):
-            # Calculate fitness for each chromosome
+            # Menghitung fitness setiap chromosome
             fitness_values = [self.calculate_fitness(chromosome) for chromosome in population]
 
-            # Find best chromosome in this generation
+            # Mencari chromosome terbaik di setiap generasi
             best_idx = fitness_values.index(max(fitness_values))
             current_best_fitness = fitness_values[best_idx]
             current_best_chromosome = population[best_idx]
 
-            # Store fitness history
+            # Menyimpan fitness histori
             self.best_fitness_history.append(current_best_fitness)
             self.avg_fitness_history.append(sum(fitness_values) / len(fitness_values))
             
-            #Top 5 index
+            # Top 5 index
             top_5_index = sorted(range(len(fitness_values)), key=lambda i : fitness_values[i], reverse=True)[:5]
 
-            # Debugging: Print generation information
+            # Print generation information
             print(f"\nKapal : {self.kapal.nama} — Generation {generation + 1}/{self.max_generations}")
             print(f"Best Fitness : {current_best_fitness:,}")
             print("Top 5 population : ")
@@ -206,12 +206,12 @@ class GeneticAlgorithmContainerOptimization:
                 print(f"{i}. Index : {index}, Fitness : {fitness_values[index] : ,}")
             print(f"Best Chromosome: {current_best_chromosome} (Index: {best_idx})")
 
-            # Track the best solution overall
+            # Track solution terbaik
             if current_best_fitness > best_fitness:
                 best_fitness = current_best_fitness
                 best_chromosome = current_best_chromosome
-                best_generation = generation + 1  # Generations are 1-based
-                best_population_index = best_idx  # Index in that generation's population
+                best_generation = generation + 1  # Generasi dimulai dari 1 (untuk mempermudah membaca)
+                best_population_index = best_idx  # Index populasi
                 generations_no_improvement = 0  # Reset improvement counter
             else:
                 generations_no_improvement += 1
@@ -219,7 +219,7 @@ class GeneticAlgorithmContainerOptimization:
                     print(f"\nEarly stopping at generation {generation + 1}")
                     break
 
-            # Apply elitism
+            # Elitism untuk memastikan tidak ada fitness bagus terlewat dari generasi sebelumnya
             elite_size = int(self.populasi_size * 0.1)
             elites = self.elitism(population, fitness_values, elite_size)
 
@@ -241,21 +241,21 @@ class GeneticAlgorithmContainerOptimization:
             # Create new population
             population = elites + offspring
 
-            # Ensure population size remains constant
+            # Memastikan size populasi tetap konstan
             if len(population) > self.populasi_size:
                 population = population[:self.populasi_size]
 
-        # Final fitness calculation if no early stopping
+        # Final fitness calculation jika tidak ada early stopping
         if generations_no_improvement < self.early_stopping:
             fitness_values = [self.calculate_fitness(chromosome) for chromosome in population]
             best_idx = fitness_values.index(max(fitness_values))
             if fitness_values[best_idx] > best_fitness:
                 best_fitness = fitness_values[best_idx]
                 best_chromosome = population[best_idx]
-                best_generation = self.max_generations  # If best appears in the final generation
+                best_generation = self.max_generations  # Jika solusi hadir di generasi terakhir
                 best_population_index = best_idx
 
-        # Print final best solution details
+        # Print final best solution
         print(f"\n=== Best Solution Found ===")
         print(f"Best Fitness: {best_fitness:,}")
         print(f"Best Chromosome: {best_chromosome}")
@@ -265,7 +265,7 @@ class GeneticAlgorithmContainerOptimization:
         return best_chromosome, best_fitness, best_generation, best_population_index
 
     def decode_solution(self, chromosome: List[int]):
-        """Menampilkan solusi dalam format yang mudah dipahami."""
+        """Menampilkan solusi dan menjelaskan setiap penalti yang terjadi."""
         peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
         
         print("\n===== SOLUSI OPTIMAL PENEMPATAN PETI KEMAS =====")
@@ -276,8 +276,12 @@ class GeneticAlgorithmContainerOptimization:
         
         total_tonase = 0
         total_revenue = 0
+        total_penalty = 0
         peti_khusus_count = 0
-        
+
+        # Tracking detail penalti
+        penalty_log = []
+
         for i, id_peti in enumerate(chromosome):
             peti = peti_dict[id_peti]
             total_tonase += peti.bobot
@@ -292,21 +296,24 @@ class GeneticAlgorithmContainerOptimization:
             
             total_revenue += revenue
             
-            # Tandai jika peti khusus melebihi kapasitas
             status = ""
             if peti.jenis == "khusus" and peti_khusus_count > self.kapal.kapasitas_khusus:
                 status = " [TIDAK AMAN]"
+                total_penalty += self.penalti_khusus
+                penalty_log.append(f"Peti #{peti.id} melebihi kapasitas khusus → penalti Rp {self.penalti_khusus:,}")
             
             print(f"{i+1}. Peti #{peti.id} - {peti.bobot} ton - {jenis_str} - Tujuan: {peti.kota_tujuan} ({peti.jarak_tujuan} km) - Revenue: Rp {revenue:,}{status}")
         
         print(f"\nTotal Tonase: {total_tonase} ton", end="")
         if total_tonase > self.kapal.tonase_maksimal:
-            print(f" [KELEBIHAN {total_tonase - self.kapal.tonase_maksimal} ton]")
+            overload = total_tonase - self.kapal.tonase_maksimal
+            print(f" [KELEBIHAN {overload} ton]")
+            overload_penalty = overload * self.penalti_tonase
+            total_penalty += overload_penalty
+            penalty_log.append(f"Kelebihan tonase {overload} ton → penalti Rp {overload_penalty:,}")
         else:
             print(f" [SISA {self.kapal.tonase_maksimal - total_tonase} ton]")
-        
-        print(f"Total Revenue: Rp {total_revenue:,}")
-        
+
         # Cek urutan berdasarkan jarak tujuan
         jarak_tujuan = [peti_dict[id_peti].jarak_tujuan for id_peti in chromosome]
         urutan_salah = 0
@@ -314,11 +321,28 @@ class GeneticAlgorithmContainerOptimization:
             for j in range(i + 1, len(chromosome)):
                 if jarak_tujuan[i] > jarak_tujuan[j]:
                     urutan_salah += 1
+                    penalty_log.append(
+                        f"Peti #{chromosome[i]} (jarak {jarak_tujuan[i]}) diletakkan di bawah Peti #{chromosome[j]} (jarak {jarak_tujuan[j]}) → penalti Rp {self.penalti_urutan:,}"
+                    )
         
         if urutan_salah > 0:
-            print(f"Peringatan: Terdapat {urutan_salah} kasus dimana peti dengan tujuan lebih jauh diletakkan di bawah peti dengan tujuan lebih dekat")
+            total_penalty += urutan_salah * self.penalti_urutan
+            print(f"Peringatan: {urutan_salah} urutan salah (penalti aktif)")
         else:
             print("Urutan peletakan sudah optimal berdasarkan jarak tujuan")
+        
+        # Summary akhir
+        print(f"\nTotal Revenue: Rp {total_revenue:,}")
+        print(f"Total Penalti: Rp {total_penalty:,}")
+        print(f"Fitness (Revenue - Penalti): Rp {total_revenue - total_penalty:,}")
+
+        # Cetak rincian penalti
+        if penalty_log:
+            print("\n--- Rincian Penalti ---")
+            for detail in penalty_log:
+                print(f"- {detail}")
+        else:
+            print("\nTidak ada penalti dalam solusi ini")
 
 # Contoh penggunaan
 def run_example():
@@ -374,20 +398,20 @@ def run_example():
         early_stopping=30
     )
     
-    # Run the genetic algorithm
-    # Store the GA instances in a list
+    # Menyimpan ga di dalam list
     ga_instances = [ga1]
 
-    # Initialize empty lists to store results
+    # Init list kosong
     best_chromosomes = []
     best_fitnesses = []
     best_generations = []
     best_population_indices = []
 
-    # Run the genetic algorithm for each instance
+    # Run GA
     start_time = time.time()
     for ga in ga_instances:
         best_chromosome, best_fitness, best_generation, best_population_index = ga.evolve()
+        ga.decode_solution(best_chromosome)
         best_chromosomes.append(best_chromosome)
         best_fitnesses.append(best_fitness)
         best_generations.append(best_generation)
