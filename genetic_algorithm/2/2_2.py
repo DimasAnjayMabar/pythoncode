@@ -71,7 +71,6 @@ class GeneticAlgorithmContainerOptimization:
         """Menghitung nilai fitness dari kromosom."""
         total_revenue = 0
         total_penalty = 0
-        penalty_customer = 0
         
         # Menyimpan informasi peti kemas dalam dictionary untuk akses cepat
         peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
