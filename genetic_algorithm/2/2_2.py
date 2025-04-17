@@ -68,48 +68,47 @@ class GeneticAlgorithmContainerOptimization:
         return population
     
     def calculate_fitness(self, chromosome: List[int]) -> float:
-        """Menghitung nilai fitness dari kromosom."""
+        """Hitung fitness dengan hard constraint: kapasitas khusus dan tonase maksimal."""
         total_revenue = 0
         total_penalty = 0
-        
-        # Menyimpan informasi peti kemas dalam dictionary untuk akses cepat
-        peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
-        
-        # Menghitung total tonase
-        total_tonase = sum(peti_dict[id_peti].bobot for id_peti in chromosome)
-        
-        # Penalti kelebihan tonase
-        if total_tonase > self.kapal.tonase_maksimal:
-            total_penalty += (total_tonase - self.kapal.tonase_maksimal) * self.penalti_tonase
-        
-        # Memeriksa urutan peti kemas berdasarkan kota tujuan
-        jarak_tujuan = [peti_dict[id_peti].jarak_tujuan for id_peti in chromosome]
-        urutan_salah = 0
-        for i in range(len(chromosome) - 1):
-            for j in range(i + 1, len(chromosome)):
-                # Jika peti di bawah (i) memiliki tujuan lebih jauh dari peti di atas (j)
-                if jarak_tujuan[i] > jarak_tujuan[j]:
-                    urutan_salah += 1
-        
-        total_penalty += urutan_salah * self.penalti_urutan
-        
-        # Memeriksa penempatan peti kemas khusus
+        total_tonase = 0.0
         peti_khusus_count = 0
-        for i, id_peti in enumerate(chromosome):
+
+        peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
+        valid_chromosome = []
+
+        for id_peti in chromosome:
             peti = peti_dict[id_peti]
-            
-            # Menambahkan pendapatan
+
+            # Skip if adding this peti exceeds total tonase
+            if total_tonase + peti.bobot > self.kapal.tonase_maksimal:
+                continue
+
+            # Skip if peti khusus melebihi kapasitas khusus
+            if peti.jenis == "khusus":
+                if peti_khusus_count >= self.kapal.kapasitas_khusus:
+                    continue
+                peti_khusus_count += 1
+
+            # Passed constraints → accept
+            total_tonase += peti.bobot
+            valid_chromosome.append(id_peti)
+
+            # Revenue
             if peti.jenis == "biasa":
                 total_revenue += peti.bobot * self.tarif_biasa
-            else:  # Khusus
+            else:
                 total_revenue += peti.bobot * self.tarif_khusus
-                peti_khusus_count += 1
-                
-                # Penalti jika peti khusus melebihi kapasitas lokasi aman
-                if peti_khusus_count > self.kapal.kapasitas_khusus:
-                    total_penalty += self.penalti_khusus
-        
-        # Fitness adalah pendapatan dikurangi penalti
+
+        # Penalti urutan salah (jika ada)
+        jarak_tujuan = [peti_dict[id_peti].jarak_tujuan for id_peti in valid_chromosome]
+        urutan_salah = 0
+        for i in range(len(valid_chromosome) - 1):
+            for j in range(i + 1, len(valid_chromosome)):
+                if jarak_tujuan[i] > jarak_tujuan[j]:
+                    urutan_salah += 1
+        total_penalty += urutan_salah * self.penalti_urutan
+
         fitness = total_revenue - total_penalty
         return max(fitness, 1) 
     
@@ -119,6 +118,8 @@ class GeneticAlgorithmContainerOptimization:
         tournament_fitness = [fitness_values[i] for i in tournament_indices]
         winner_index = tournament_indices[tournament_fitness.index(max(tournament_fitness))]
         return population[winner_index].copy()
+    
+    """ TAMBAHKAN ROULETE WHEELE SELECTION DISINI """
     
     def partially_mapped_crossover(self, parent1: List[int], parent2: List[int]) -> Tuple[List[int], List[int]]:
         """Partially Mapped Crossover (PMX) untuk dua parent."""
@@ -227,6 +228,7 @@ class GeneticAlgorithmContainerOptimization:
             while len(offspring) < self.populasi_size - elite_size:
                 parent1 = self.tournament_selection(population, fitness_values)
                 parent2 = self.tournament_selection(population, fitness_values)
+                """ PANGGIL ROULETE WHEELE DI SINI (COMMENT SALAH SATU UNTUK MENJALANKAN SALAH SATU)"""
 
                 if random.random() < self.crossover_rate:
                     child1, child2 = self.partially_mapped_crossover(parent1, parent2)
@@ -264,7 +266,7 @@ class GeneticAlgorithmContainerOptimization:
         return best_chromosome, best_fitness, best_generation, best_population_index
 
     def decode_solution(self, chromosome: List[int]):
-        """Menampilkan solusi dan menjelaskan setiap penalti yang terjadi."""
+        """Tampilkan solusi dan exclude peti khusus melebihi kapasitas."""
         peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
         
         print("\n===== SOLUSI OPTIMAL PENEMPATAN PETI KEMAS =====")
@@ -277,58 +279,59 @@ class GeneticAlgorithmContainerOptimization:
         total_revenue = 0
         total_penalty = 0
         peti_khusus_count = 0
-
-        # Tracking detail penalti
         penalty_log = []
+        valid_chromosome = []
 
-        for i, id_peti in enumerate(chromosome):
+        for id_peti in chromosome:
             peti = peti_dict[id_peti]
-            total_tonase += peti.bobot
-            
-            jenis_str = "BIASA"
+            if total_tonase + peti.bobot > self.kapal.tonase_maksimal:
+                continue
             if peti.jenis == "khusus":
-                jenis_str = "KHUSUS"
+                if peti_khusus_count >= self.kapal.kapasitas_khusus:
+                    continue
                 peti_khusus_count += 1
-                revenue = peti.bobot * self.tarif_khusus
-            else:
-                revenue = peti.bobot * self.tarif_biasa
-            
-            total_revenue += revenue
-            
-            status = ""
-            if peti.jenis == "khusus" and peti_khusus_count > self.kapal.kapasitas_khusus:
-                status = " [TIDAK AMAN]"
-                total_penalty += self.penalti_khusus
-                penalty_log.append(f"Peti #{peti.id} melebihi kapasitas khusus → penalti Rp {self.penalti_khusus:,}")
-            
-            print(f"{i+1}. Peti #{peti.id} - {peti.bobot} ton - {jenis_str} - Tujuan: {peti.kota_tujuan} ({peti.jarak_tujuan} km) - Revenue: Rp {revenue:,}{status}")
-        
-        print(f"\nTotal Tonase: {total_tonase} ton", end="")
-        if total_tonase > self.kapal.tonase_maksimal:
-            overload = total_tonase - self.kapal.tonase_maksimal
-            print(f" [KELEBIHAN {overload} ton]")
-            overload_penalty = overload * self.penalti_tonase
-            total_penalty += overload_penalty
-            penalty_log.append(f"Kelebihan tonase {overload} ton → penalti Rp {overload_penalty:,}")
-        else:
-            print(f" [SISA {self.kapal.tonase_maksimal - total_tonase} ton]")
+            total_tonase += peti.bobot
+            valid_chromosome.append(id_peti)
 
-        # Cek urutan berdasarkan jarak tujuan
-        jarak_tujuan = [peti_dict[id_peti].jarak_tujuan for id_peti in chromosome]
+        for i, id_peti in enumerate(valid_chromosome):
+            peti = peti_dict[id_peti]
+            jenis_str = "KHUSUS" if peti.jenis == "khusus" else "BIASA"
+            revenue = peti.bobot * (self.tarif_khusus if peti.jenis == "khusus" else self.tarif_biasa)
+            total_revenue += revenue
+
+            print(f"{i+1}. Peti #{peti.id} - {peti.bobot} ton - {jenis_str} - Tujuan: {peti.kota_tujuan} ({peti.jarak_tujuan} km) - Revenue: Rp {revenue:,}")
+
+        print(f"\nTotal Tonase: {total_tonase} ton [SISA {self.kapal.tonase_maksimal - total_tonase} ton]")
+
+        # Cek urutan berdasarkan jarak
+        jarak_tujuan = [peti_dict[id_peti].jarak_tujuan for id_peti in valid_chromosome]
         urutan_salah = 0
-        for i in range(len(chromosome) - 1):
-            for j in range(i + 1, len(chromosome)):
+        for i in range(len(valid_chromosome) - 1):
+            for j in range(i + 1, len(valid_chromosome)):
                 if jarak_tujuan[i] > jarak_tujuan[j]:
                     urutan_salah += 1
                     penalty_log.append(
-                        f"Peti #{chromosome[i]} (jarak {jarak_tujuan[i]}) diletakkan di bawah Peti #{chromosome[j]} (jarak {jarak_tujuan[j]}) → penalti Rp {self.penalti_urutan:,}"
+                        f"Peti #{valid_chromosome[i]} (jarak {jarak_tujuan[i]}) di bawah Peti #{valid_chromosome[j]} (jarak {jarak_tujuan[j]}) → penalti Rp {self.penalti_urutan:,}"
                     )
-        
+
         if urutan_salah > 0:
             total_penalty += urutan_salah * self.penalti_urutan
             print(f"Peringatan: {urutan_salah} urutan salah (penalti aktif)")
         else:
             print("Urutan peletakan sudah optimal berdasarkan jarak tujuan")
+
+        # Summary akhir
+        print(f"\nTotal Revenue: Rp {total_revenue:,}")
+        print(f"Total Penalti: Rp {total_penalty:,}")
+        print(f"Fitness (Revenue - Penalti): Rp {total_revenue - total_penalty:,}")
+
+        if penalty_log:
+            print("\n--- Rincian Penalti ---")
+            for p in penalty_log:
+                print(f"- {p}")
+        else:
+            print("\nTidak ada penalti dalam solusi ini ")
+
         
         # Summary akhir
         print(f"\nTotal Revenue: Rp {total_revenue:,}")
