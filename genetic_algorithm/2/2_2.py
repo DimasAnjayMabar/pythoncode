@@ -228,7 +228,7 @@ class GeneticAlgorithmContainerOptimization:
             while len(offspring) < self.populasi_size - elite_size:
                 parent1 = self.tournament_selection(population, fitness_values)
                 parent2 = self.tournament_selection(population, fitness_values)
-                """ PANGGIL ROULETE WHEELE DI SINI (COMMENT SALAH SATU UNTUK MENJALANKAN SALAH SATU)"""
+                """ PANGGIL ROULETE WHEELE DI SINI (COMMENT SALAH SATU UNTUK MENJALANKAN SALAH SATU ANTARA PAKE TOURNAMENT ATAU ROULETE)"""
 
                 if random.random() < self.crossover_rate:
                     child1, child2 = self.partially_mapped_crossover(parent1, parent2)
