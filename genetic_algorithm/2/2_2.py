@@ -509,7 +509,7 @@ class GeneticAlgorithmContainerOptimization:
                     else:
                         loaded_ids.append(id_peti)
                 
-                print(f"Best Chromosome (Loaded Containers) : {loaded_ids}")
+                print(f"Best Chromosome      : {loaded_ids}")
             else:
                 print(f"Best Chromosome      : {best_overall_chromosome}")
             
@@ -635,37 +635,58 @@ class GeneticAlgorithmContainerOptimization:
 # Fungsi main
 # ==============================================================================
 def run_interactive_menu():
-    print("=== MENU OPTIMASI GENETIKA ===")
-    print("Pilih Metode Seleksi:")
-    print("1. Tournament")
-    print("2. Roulette")
-    selection_choice = input("Masukkan pilihan (1/2): ").strip()
+    while True:  # Main program loop
+        print("\n=== MENU OPTIMASI GENETIKA ===")
+        print("Pilih Metode Seleksi:")
+        print("1. Tournament")
+        print("2. Roulette")
+        print("0. Keluar dari Program")
+        selection_choice = input("Masukkan pilihan (1/2/0): ").strip()
 
-    if selection_choice == '1':
-        selection_method = 'tournament'
-    elif selection_choice == '2':
-        selection_method = 'roulette'
-    else:
-        print("Pilihan seleksi tidak valid. Default: Tournament")
-        selection_method = 'tournament'
+        if selection_choice == '0':
+            print("\nTerima kasih telah menggunakan program. Sampai jumpa!")
+            break  # Exit the program
+        
+        if selection_choice == '1':
+            selection_method = 'tournament'
+        elif selection_choice == '2':
+            selection_method = 'roulette'
+        else:
+            print("Pilihan seleksi tidak valid. Default: Tournament")
+            selection_method = 'tournament'
+            # Instead of defaulting, you could continue to make them choose again
+            # continue
 
-    print("\nPilih Fungsi Fitness:")
-    print("1. Original")
-    print("2. Alternative")
-    fitness_choice = input("Masukkan pilihan (1/2): ").strip()
+        print("\nPilih Fungsi Fitness:")
+        print("1. Original")
+        print("2. Alternative")
+        print("0. Kembali ke Menu Utama")
+        fitness_choice = input("Masukkan pilihan (1/2/0): ").strip()
 
-    if fitness_choice == '1':
-        fitness_type = 'original'
-    elif fitness_choice == '2':
-        fitness_type = 'alternative'
-    else:
-        print("Pilihan fitness tidak valid. Default: Original")
-        fitness_type = 'original'
+        if fitness_choice == '0':
+            continue  # Go back to main menu
+        
+        if fitness_choice == '1':
+            fitness_type = 'original'
+        elif fitness_choice == '2':
+            fitness_type = 'alternative'
+        else:
+            print("Pilihan fitness tidak valid. Default: Original")
+            fitness_type = 'original'
+            # Alternatively: continue to make them choose again
 
-    print(f"\n>> Metode Seleksi: {selection_method.capitalize()}")
-    print(f">> Fungsi Fitness: {fitness_type.capitalize()}")
+        print(f"\n>> Metode Seleksi: {selection_method.capitalize()}")
+        print(f">> Fungsi Fitness: {fitness_type.capitalize()}")
 
-    run_ga(selection_method, fitness_type)
+        run_ga(selection_method, fitness_type)
+
+        # Ask if user wants to continue after each run
+        print("\nApakah Anda ingin mencoba lagi?")
+        continue_choice = input("Masukkan pilihan (y/n): ").strip()
+        
+        if continue_choice == 'n':
+            print("\nTerima kasih telah menggunakan program. Sampai jumpa!")
+            break
 
 def run_ga(selection_method, fitness_type):
     peti_kemas_list = [
