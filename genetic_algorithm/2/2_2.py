@@ -491,7 +491,28 @@ class GeneticAlgorithmContainerOptimization:
         print(f"\n=== Evolusi Selesai untuk Kapal: {self.kapal.nama} ({selection_method.capitalize()} / {fitness_function_type.capitalize()}) ===")
         if best_overall_chromosome:
             print(f"Best Fitness Overall : {best_overall_fitness:,.2f}")
-            print(f"Best Chromosome      : {best_overall_chromosome}")
+            
+            # For alternative fitness, show only loaded containers
+            if fitness_function_type == 'alternative':
+                peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
+                loaded_ids = []
+                peti_khusus_loaded = 0
+                
+                for id_peti in best_overall_chromosome:
+                    peti = peti_dict[id_peti]
+                    if peti.jenis == "khusus":
+                        if peti_khusus_loaded < self.kapal.kapasitas_khusus:
+                            loaded_ids.append(id_peti)
+                            peti_khusus_loaded += 1
+                        else:
+                            continue  # Skip this special container
+                    else:
+                        loaded_ids.append(id_peti)
+                
+                print(f"Best Chromosome (Loaded Containers) : {loaded_ids}")
+            else:
+                print(f"Best Chromosome      : {best_overall_chromosome}")
+            
             print(f"Ditemukan di Gen     : {best_generation}")
             print(f"Index Populasi       : {best_population_index}")
         else:
@@ -504,7 +525,7 @@ class GeneticAlgorithmContainerOptimization:
 # ==============================================================================
 # Print detail container dalam kapal
 # ==============================================================================
-    def decode_solution(self, chromosome: List[int]):
+    def decode_solution(self, chromosome: List[int], fitness_function_type='original'):
         """Menampilkan solusi dan menjelaskan setiap penalti yang terjadi."""
         peti_dict = {peti.id: peti for peti in self.peti_kemas_list}
 
@@ -512,6 +533,9 @@ class GeneticAlgorithmContainerOptimization:
         print(f"Kapal: {self.kapal.nama}")
         print(f"Tonase Maksimal: {self.kapal.tonase_maksimal} ton")
         print(f"Kapasitas Peti Khusus: {self.kapal.kapasitas_khusus}")
+        
+        if fitness_function_type == 'alternative':
+            print("\n[NOTE: Using Alternative Fitness - Special containers beyond capacity are NOT LOADED]")
         print("\nUrutan Penempatan Peti Kemas (dari bawah ke atas):")
 
         total_tonase = 0
@@ -521,8 +545,30 @@ class GeneticAlgorithmContainerOptimization:
 
         # Tracking detail penalti
         penalty_log = []
+        
+        # For alternative fitness, track which containers are actually loaded
+        actually_loaded_ids = []
+        
+        # First pass: determine which containers are actually loaded (for alternative fitness)
+        if fitness_function_type == 'alternative':
+            peti_khusus_loaded_count = 0
+            for id_peti in chromosome:
+                peti = peti_dict[id_peti]
+                can_be_loaded = True
+                
+                if peti.jenis == "khusus":
+                    if peti_khusus_loaded_count >= self.kapal.kapasitas_khusus:
+                        can_be_loaded = False
+                
+                if can_be_loaded:
+                    actually_loaded_ids.append(id_peti)
+                    if peti.jenis == "khusus":
+                        peti_khusus_loaded_count += 1
+        else:
+            actually_loaded_ids = chromosome.copy()
 
-        for i, id_peti in enumerate(chromosome):
+        # Second pass: calculate metrics and display only loaded containers
+        for i, id_peti in enumerate(actually_loaded_ids):
             peti = peti_dict[id_peti]
             total_tonase += peti.bobot
 
@@ -542,9 +588,9 @@ class GeneticAlgorithmContainerOptimization:
                 total_penalty += self.penalti_khusus
                 penalty_log.append(f"Peti #{peti.id} melebihi kapasitas khusus → penalti Rp {self.penalti_khusus:,}")
 
-            print(
-                f"{i + 1}. Peti #{peti.id} - {peti.bobot} ton - {jenis_str} - Tujuan: {peti.kota_tujuan} ({peti.jarak_tujuan} km) - Revenue: Rp {revenue:,}{status}")
+            print(f"{i + 1}. Peti #{peti.id} - {peti.bobot} ton - {jenis_str} - Tujuan: {peti.kota_tujuan} ({peti.jarak_tujuan} km) - Revenue: Rp {revenue:,}{status}")
 
+        # Rest of the method remains the same...
         print(f"\nTotal Tonase: {total_tonase} ton", end="")
         if total_tonase > self.kapal.tonase_maksimal:
             overload = total_tonase - self.kapal.tonase_maksimal
@@ -555,15 +601,15 @@ class GeneticAlgorithmContainerOptimization:
         else:
             print(f" [SISA {self.kapal.tonase_maksimal - total_tonase} ton]")
 
-        # Cek urutan berdasarkan jarak tujuan
-        jarak_tujuan = [peti_dict[id_peti].jarak_tujuan for id_peti in chromosome]
+        # Cek urutan berdasarkan jarak tujuan (only for loaded containers)
+        jarak_tujuan = [peti_dict[id_peti].jarak_tujuan for id_peti in actually_loaded_ids]
         urutan_salah = 0
-        for i in range(len(chromosome) - 1):
-            for j in range(i + 1, len(chromosome)):
+        for i in range(len(actually_loaded_ids) - 1):
+            for j in range(i + 1, len(actually_loaded_ids)):
                 if jarak_tujuan[i] > jarak_tujuan[j]:
                     urutan_salah += 1
                     penalty_log.append(
-                        f"Peti #{chromosome[i]} (jarak {jarak_tujuan[i]}) diletakkan di bawah Peti #{chromosome[j]} (jarak {jarak_tujuan[j]}) → penalti Rp {self.penalti_urutan:,}"
+                        f"Peti #{actually_loaded_ids[i]} (jarak {jarak_tujuan[i]}) diletakkan di bawah Peti #{actually_loaded_ids[j]} (jarak {jarak_tujuan[j]}) → penalti Rp {self.penalti_urutan:,}"
                     )
 
         if urutan_salah > 0:
@@ -651,10 +697,7 @@ def run_ga(selection_method, fitness_type):
     best_chromo, best_fit, _, _, _, _ = ga_instance.evolve(selection_method, fitness_type)
     if best_chromo:
         print("\n--- Rincian Solusi ---")
-        for i, id_peti in enumerate(best_chromo):
-            peti = next(p for p in peti_kemas_list if p.id == id_peti)
-            print(f"{i+1}. Peti #{peti.id} - {peti.bobot} ton - {peti.jenis.upper()} - Tujuan: {peti.kota_tujuan} ({peti.jarak_tujuan} km)")
-
+        ga_instance.decode_solution(best_chromo, fitness_type)
         print(f"\nFitness ({fitness_type.capitalize()}): Rp {best_fit:,.2f}")
     else:
         print("Tidak ada solusi valid ditemukan.")
