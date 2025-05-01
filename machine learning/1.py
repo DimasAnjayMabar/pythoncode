@@ -5,6 +5,7 @@ import math
 from collections import Counter
 
 # Training data format = [fever, head aches, general aches, weakness, exhaustion, stuffy nose, sneezing, sore throat, chest discomfort], diagnosis
+# Convert condition into = none = 0, mild = 1, severe = 2
 data = [
     ([0, 1, 0, 0, 0, 1, 2, 2, 1], 'Cold'),
     ([2, 2, 2, 2, 2, 0, 0, 2, 2], 'Flu'),
@@ -53,7 +54,7 @@ for k in [3, 6, 4, 2, 5]:
     
     print(f"\nK = {k}")
     print("Simple majority vote result : ", simple_result)
-    print("Weighted maority vote result : ", weighted_result) 
+    print("Weighted majority vote result : ", weighted_result) 
 
 # ===============================================================
 

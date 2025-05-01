@@ -4,7 +4,7 @@
 import math
 from collections import Counter
 
-# Training data format = [sepal length, sepah width], species
+# Training data format = [sepal length, sepal width], species
 data = [
     ([5.3, 3.7], 'Setosa'), 
     ([5.2, 3.8], 'Setosa'), 
